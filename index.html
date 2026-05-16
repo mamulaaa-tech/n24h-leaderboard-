@@ -826,14 +826,16 @@ const SECTOR_BOUNDARIES = [0, 4, 7, 11, 15, 19, 22, 26, 29, 32];
 
 function getTrackPosition(sectorIndex, progress) {
     // sectorIndex: 0-8, progress: 0-1 within sector
-    const startIdx = SECTOR_BOUNDARIES[sectorIndex];
-    const endIdx = SECTOR_BOUNDARIES[sectorIndex + 1] || TRACK_POINTS.length - 1;
+    const si = Math.max(0, Math.min(8, sectorIndex || 0));
+    const pr = Math.max(0, Math.min(0.99, progress || 0));
+    const startIdx = SECTOR_BOUNDARIES[si];
+    const endIdx = SECTOR_BOUNDARIES[si + 1] !== undefined ? SECTOR_BOUNDARIES[si + 1] : TRACK_POINTS.length - 1;
     const segPoints = [];
     for (let i = startIdx; i <= endIdx; i++) segPoints.push(TRACK_POINTS[i]);
-    if (segPoints.length < 2) return segPoints[0];
+    if (segPoints.length < 2) return segPoints[0] || {x:450,y:460};
     const totalLen = segPoints.length - 1;
-    const pos = progress * totalLen;
-    const idx = Math.min(Math.floor(pos), totalLen - 1);
+    const pos = pr * totalLen;
+    const idx = Math.max(0, Math.min(Math.floor(pos), totalLen - 1));
     const t = pos - idx;
     return {
         x: segPoints[idx].x + (segPoints[idx+1].x - segPoints[idx].x) * t,
@@ -842,28 +844,25 @@ function getTrackPosition(sectorIndex, progress) {
 }
 
 function getCarTrackInfo(car) {
-    // Determine which sector the car is currently in based on filled sector times
+    if (!car) return { sector: 0, progress: 0, sectorTimes: [], lastFilledSector: 0 };
     let lastFilledSector = 0;
     let sectorTimes = [];
     for (let i = 1; i <= 9; i++) {
         const st = car['S'+i+'TIME'];
-        if (st && st.trim()) {
+        if (st && String(st).trim()) {
             lastFilledSector = i;
             sectorTimes.push(lapTimeToSeconds(st));
         } else {
             break;
         }
     }
-    // Car is currently in sector (lastFilledSector + 1), or sector 1 if none filled
-    const currentSector = lastFilledSector < 9 ? lastFilledSector : 0; // 0-indexed
-    // Estimate progress within current sector using LASTIMTIME
+    const currentSector = lastFilledSector < 9 ? lastFilledSector : 0;
     const now = Date.now();
     const lastIm = parseInt(car.LASTIMTIME) || now;
-    const elapsed = (now - lastIm) / 1000;
-    // Average sector time ~ avgLap / 9
+    const elapsed = Math.max(0, (now - lastIm) / 1000);
     const avgLapSec = lapTimeToSeconds(car.LASTLAPTIME);
     const avgSectorTime = isFinite(avgLapSec) && avgLapSec > 0 ? avgLapSec / 9 : 60;
-    const progress = Math.min(0.95, elapsed / avgSectorTime);
+    const progress = Math.max(0, Math.min(0.95, elapsed / avgSectorTime));
     return { sector: currentSector, progress, sectorTimes, lastFilledSector };
 }
 
@@ -881,8 +880,13 @@ let trackFilterClasses = new Set();
 let trackShowTop = 0; // 0 = all
 
 function showTrackMap() {
-    currentView = 'trackmap';
-    renderTrackMap();
+    try {
+        currentView = 'trackmap';
+        renderTrackMap();
+    } catch(e) {
+        console.error('TrackMap error:', e);
+        alert('TrackMap error: ' + e.message);
+    }
 }
 
 function renderTrackMap() {
@@ -928,7 +932,7 @@ function renderTrackMap() {
         <div class="track-stats">
             <div class="track-stat"><div class="ts-label">Cars on Track</div><div class="ts-value">${R.length}</div></div>
             <div class="track-stat"><div class="ts-label">Leader</div><div class="ts-value">#${R[0]?.STNR} ${escH(R[0]?.TEAM||'')}</div></div>
-            <div class="track-stat"><div class="ts-label">Fastest Lap</div><div class="ts-value">${R.reduce((b,r)=>{const t=lapTimeToSeconds(r.FASTESTLAP);return t<b.t?{t,s:`#${r.STNR} ${r.FASTESTLAP}`}:b;},{t:Infinity,s:'-'}).s}</div></div>
+            <div class="track-stat"><div class="ts-label">Fastest Lap</div><div class="ts-value">${R.reduce((b,r)=>{const t=lapTimeToSeconds(r.FASTESTLAP);return t<b.t?{t,s:'#'+r.STNR+' '+r.FASTESTLAP}:b;},{t:Infinity,s:'-'}).s}</div></div>
             <div class="track-stat"><div class="ts-label">Laps Completed</div><div class="ts-value">${R[0]?.LAPS||'-'}</div></div>
         </div>
     </div></div>`;
@@ -947,13 +951,16 @@ function renderCarDots(R) {
     let filtered = R.filter(r => trackFilterClasses.has(r.CLASSNAME));
     if (trackShowTop > 0) filtered = filtered.filter(r => r.POSITION <= trackShowTop);
     return filtered.map(r => {
-        const info = getCarTrackInfo(r);
-        const pos = getTrackPosition(info.sector, info.progress);
-        const color = classColor(r.CLASSNAME);
-        return `<circle class="car-dot" cx="${pos.x}" cy="${pos.y}" r="5" fill="${color}" stroke="#0f172a" stroke-width="1.5" onclick="showCarDetail('${r.STNR}')">
-                    <title>#${r.STNR} ${r.TEAM} (P${r.POSITION}) - S${info.sector+1}</title>
-                </circle>
-                <text class="car-label" x="${pos.x}" y="${pos.y}">${r.STNR}</text>`;
+        try {
+            const info = getCarTrackInfo(r);
+            const pos = getTrackPosition(info.sector, info.progress);
+            if (!pos) return '';
+            const color = classColor(r.CLASSNAME);
+            return `<circle class="car-dot" cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="5" fill="${color}" stroke="#0f172a" stroke-width="1.5" onclick="showCarDetail('${r.STNR}')">
+                        <title>#${r.STNR} ${escH(r.TEAM)} (P${r.POSITION}) - S${info.sector+1}</title>
+                    </circle>
+                    <text class="car-label" x="${pos.x.toFixed(1)}" y="${pos.y.toFixed(1)}">${r.STNR}</text>`;
+        } catch(e) { console.warn('Car dot error for #'+r.STNR, e); return ''; }
     }).join('');
 }
 
