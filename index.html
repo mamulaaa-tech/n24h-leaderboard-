@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N24h Leaderboard - Enhanced</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0a0a0f; color: #e0e0e0; min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 20px 30px; border-bottom: 2px solid #0f3460;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .header h1 { font-size: 1.4rem; color: #fff; }
+        .header .race-info { color: #8892b0; font-size: 0.85rem; }
+        .header .status { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: pulse 2s infinite; }
+        .status-dot.connected { background: #22c55e; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .back-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 16px; background: #1e293b; border: 1px solid #334155;
+            border-radius: 6px; color: #94a3b8; cursor: pointer;
+            font-size: 0.85rem; margin-bottom: 16px; transition: all 0.2s;
+        }
+        .back-btn:hover { background: #334155; color: #fff; }
+
+        /* Leaderboard */
+        .lb-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+        .lb-toolbar .btn {
+            padding: 7px 16px; border-radius: 6px; border: 1px solid #334155;
+            background: #1e293b; color: #94a3b8; cursor: pointer; font-size: 0.8rem; transition: all .2s;
+        }
+        .lb-toolbar .btn:hover { background: #334155; color: #fff; }
+        .lb-toolbar .btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+        .lb-toolbar .btn.compare-go { background: #22c55e; border-color: #22c55e; color: #000; font-weight: 600; }
+        .lb-toolbar .btn.compare-go:disabled { opacity: .4; cursor: default; }
+        .compare-count { color: #60a5fa; font-size: 0.8rem; }
+        .leaderboard-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .leaderboard-table th {
+            background: #1e293b; padding: 10px 12px; text-align: left;
+            font-weight: 600; color: #94a3b8; font-size: 0.75rem;
+            text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 10;
+        }
+        .leaderboard-table td { padding: 8px 12px; border-bottom: 1px solid #1e293b; }
+        .leaderboard-table tr { cursor: pointer; transition: background 0.15s; }
+        .leaderboard-table tbody tr:hover { background: #1e293b; }
+        .leaderboard-table tbody tr.selected-row { background: #1a2744; }
+        .pos { font-weight: 700; color: #fff; min-width: 30px; }
+        .pos-1 { color: #fbbf24; } .pos-2 { color: #94a3b8; } .pos-3 { color: #cd7c32; }
+        .car-num { background: #334155; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; display: inline-block; min-width: 36px; text-align: center; }
+        .team-name { font-weight: 500; color: #fff; }
+        .driver-name { color: #94a3b8; }
+        .class-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; background: #1e3a5f; color: #60a5fa; }
+        .chg-up { color: #22c55e; } .chg-down { color: #ef4444; }
+        .fastest { color: #a855f7; font-weight: 600; }
+        .cb-cell { width: 30px; text-align: center; }
+        .cb-cell input { accent-color: #3b82f6; width: 16px; height: 16px; cursor: pointer; }
+
+        /* Detail */
+        .detail-header { background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 12px; padding: 24px; margin-bottom: 20px; border: 1px solid #334155; }
+        .detail-header h2 { font-size: 1.5rem; margin-bottom: 4px; }
+        .detail-header .meta { color: #94a3b8; font-size: 0.9rem; display: flex; gap: 20px; margin-top: 8px; flex-wrap: wrap; }
+        .detail-header .meta span { display: flex; align-items: center; gap: 4px; }
+        .current-stint-box {
+            margin-top: 14px; padding: 12px 16px; background: #0f172a; border-radius: 8px;
+            border: 1px solid #334155; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+        }
+        .current-stint-box .cs-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; }
+        .current-stint-box .cs-value { font-size: 1.1rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .current-stint-box .cs-progress { flex: 1; min-width: 120px; }
+        .cs-progress-bar { height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+        .cs-progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #22c55e, #f59e0b); transition: width .5s; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #334155; }
+        .tab { padding: 10px 20px; cursor: pointer; color: #64748b; font-size: 0.85rem; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab:hover { color: #94a3b8; }
+        .tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .driver-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px; background: #1e293b; border-radius: 8px; }
+        .driver-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; }
+        .driver-color-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+        .laps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+        .lap-card { background: #1e293b; border-radius: 6px; padding: 8px 10px; text-align: center; border: 1px solid #334155; font-size: 0.8rem; border-left: 4px solid #334155; }
+        .lap-card .lap-num { color: #64748b; font-size: 0.7rem; margin-bottom: 2px; }
+        .lap-card .lap-time { font-weight: 600; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; }
+        .lap-card .lap-driver { font-size: 0.65rem; margin-top: 3px; font-weight: 500; letter-spacing: 0.3px; }
+        .lap-card.best-lap { border-color: #a855f7; background: #1e1033; }
+        .lap-card.best-lap .lap-time { color: #a855f7; }
+        .lap-card.pit-lap { border-right: 2px solid #f59e0b; }
+        .lap-card.pit-lap .lap-time { color: #f59e0b; }
+
+        .stints-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .stints-table th { background: #1e293b; padding: 10px 12px; text-align: left; font-weight: 600; color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; }
+        .stints-table td { padding: 10px 12px; border-bottom: 1px solid #1e293b; }
+        .stint-driver { font-weight: 600; color: #fff; }
+        .stint-bar { height: 6px; border-radius: 3px; background: #334155; overflow: hidden; margin-top: 4px; }
+        .stint-bar-fill { height: 100%; border-radius: 3px; }
+
+        .lap-chart-container { overflow-x: auto; margin-top: 12px; }
+        .lap-chart-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; }
+        .lap-chart-table th { background: #1e293b; padding: 6px 10px; text-align: center; font-weight: 500; color: #64748b; position: sticky; top: 0; }
+        .lap-chart-table td { padding: 5px 10px; text-align: center; border-bottom: 1px solid #1e293b; }
+        .lap-chart-table tr:hover { background: #1e293b; }
+
+        .loading { display: flex; align-items: center; justify-content: center; padding: 60px; color: #64748b; }
+        .spinner { width: 24px; height: 24px; border: 3px solid #334155; border-top-color: #60a5fa; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: #1e293b; border-radius: 8px; padding: 16px; border: 1px solid #334155; }
+        .stat-card .label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .value { font-size: 1.2rem; font-weight: 700; color: #fff; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+
+        /* Compare */
+        .cmp-section { margin-bottom: 28px; }
+        .cmp-section h3 { color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px; }
+        .cmp-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        .cmp-table th { background: #1e293b; padding: 8px 10px; text-align: center; color: #94a3b8; font-size: 0.72rem; text-transform: uppercase; position: sticky; top: 0; z-index: 5; }
+        .cmp-table th:first-child { text-align: left; }
+        .cmp-table td { padding: 7px 10px; border-bottom: 1px solid #1e293b; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+        .cmp-table td:first-child { text-align: left; font-family: inherit; }
+        .cmp-table tr:hover { background: #1e293b; }
+        .cmp-best { color: #22c55e; font-weight: 600; }
+        .cmp-worst { color: #ef4444; }
+        .cmp-filter { margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .cmp-filter .chip {
+            padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; cursor: pointer;
+            border: 1px solid #334155; background: #1e293b; color: #94a3b8; transition: all .15s;
+        }
+        .cmp-filter .chip.on { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+
+        /* Quick compare panel */
+        .qc-panel {
+            margin-top: 12px; background: #0f172a; border: 1px solid #334155;
+            border-radius: 10px; padding: 16px; max-height: 500px; overflow-y: auto;
+        }
+        .qc-search {
+            width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #334155;
+            background: #1e293b; color: #e2e8f0; font-size: 0.85rem; margin-bottom: 10px; outline: none;
+        }
+        .qc-search:focus { border-color: #3b82f6; }
+        .qc-list { max-height: 200px; overflow-y: auto; margin-bottom: 12px; }
+        .qc-item {
+            display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+            border-radius: 4px; cursor: pointer; font-size: 0.82rem; transition: background .1s;
+        }
+        .qc-item:hover { background: #1e293b; }
+        .qc-item input { accent-color: #3b82f6; width: 15px; height: 15px; cursor: pointer; }
+        .qc-item .qc-num { color: #64748b; min-width: 30px; font-weight: 600; }
+        .qc-item .qc-team { color: #e2e8f0; }
+        .qc-item .qc-pos { color: #94a3b8; font-size: 0.75rem; margin-left: auto; }
+        .qc-go {
+            padding: 8px 20px; border-radius: 6px; border: none;
+            background: #3b82f6; color: #fff; font-weight: 600; font-size: 0.85rem;
+            cursor: pointer; transition: background .2s;
+        }
+        .qc-go:hover { background: #2563eb; }
+        .qc-go:disabled { opacity: .4; cursor: default; }
+        .qc-result { margin-top: 16px; }
+        .qc-result table { width: 100%; }
+
+        /* Track Map */
+        .track-section { margin-bottom: 24px; }
+        .track-container {
+            background: #0f172a; border: 1px solid #334155; border-radius: 12px;
+            padding: 20px; position: relative; overflow: hidden;
+        }
+        .track-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .track-header h2 { font-size: 1.1rem; color: #e2e8f0; }
+        .track-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.75rem; color: #94a3b8; }
+        .track-legend-item { display: flex; align-items: center; gap: 4px; }
+        .track-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .track-svg-wrap { width: 100%; max-width: 900px; margin: 0 auto; }
+        .track-svg-wrap svg { width: 100%; height: auto; }
+        .car-dot { transition: all 1.5s ease-in-out; cursor: pointer; }
+        .car-dot:hover { r: 7; }
+        .car-label { font-size: 7px; fill: #fff; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+        .sector-label { font-size: 8px; fill: #475569; font-weight: 600; }
+        .track-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .track-filter .chip {
+            padding: 4px 12px; border-radius: 16px; font-size: 0.75rem; cursor: pointer;
+            border: 1px solid #334155; background: #1e293b; color: #94a3b8; transition: all .15s;
+        }
+        .track-filter .chip.on { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+        .track-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 16px; }
+        .track-stat { background: #1e293b; border-radius: 8px; padding: 10px 14px; border: 1px solid #334155; }
+        .track-stat .ts-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; }
+        .track-stat .ts-value { font-size: 1rem; font-weight: 700; color: #e2e8f0; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+        /* Traffic Predictions */
+        .traffic-section { margin-top: 24px; }
+        .traffic-container {
+            background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 20px;
+        }
+        .traffic-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        .traffic-table th {
+            background: #1e293b; padding: 8px 10px; text-align: left; font-weight: 600;
+            color: #94a3b8; font-size: 0.72rem; text-transform: uppercase; position: sticky; top: 0;
+        }
+        .traffic-table td { padding: 7px 10px; border-bottom: 1px solid #1e293b; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+        .traffic-table tr:hover { background: #1e293b; }
+        .traffic-danger { color: #ef4444; font-weight: 600; }
+        .traffic-warn { color: #f59e0b; }
+        .traffic-ok { color: #22c55e; }
+        .traffic-tag {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 0.7rem; font-weight: 600; font-family: inherit;
+        }
+        .traffic-tag.danger { background: #451a1a; color: #ef4444; }
+        .traffic-tag.warn { background: #422006; color: #f59e0b; }
+        .traffic-tag.clear { background: #052e16; color: #22c55e; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1 id="raceTitle">54. ADAC RAVENOL 24h Nurburgring</h1>
+            <div class="race-info" id="raceInfo">Loading...</div>
+        </div>
+        <div class="status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Connecting...</span>
+        </div>
+    </div>
+    <div class="container"><div id="app"><div class="loading"><div class="spinner"></div>Connecting to live timing...</div></div></div>
+
+<script>
+const WS_URL = 'wss://livetiming.azurewebsites.net';
+const EVENT_ID = '50';
+const DRIVER_COLORS = [
+    {border:'#3b82f6',name:'#93bbfc'},{border:'#a855f7',name:'#d8b4fe'},
+    {border:'#22c55e',name:'#86efac'},{border:'#f59e0b',name:'#fde68a'},
+    {border:'#ef4444',name:'#fca5a5'},{border:'#06b6d4',name:'#67e8f9'},
+];
+const CAR_COLORS = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7','#06b6d4','#ec4899','#f97316'];
+
+let resultsData = null, stintsData = null, lapData = {};
+let currentView = 'leaderboard', currentCar = null;
+let compareMode = false, compareSet = new Set();
+
+// ── WebSocket ──
+class LiveTimingConnection {
+    constructor(ch, onData) { this.ch = ch; this.onData = onData; this.ws = null; this.connect(); }
+    connect() {
+        this.ws = new WebSocket(WS_URL);
+        this.ws.onopen = () => this.ws.send(JSON.stringify({eventId:EVENT_ID,eventPid:this.ch,clientLocalTime:Date.now()}));
+        this.ws.onmessage = (e) => { try { const m=JSON.parse(e.data); if(m.PID!=='LTS_TIMESYNC') this.onData(m); } catch(x){} };
+        this.ws.onclose = () => setTimeout(()=>this.connect(),3000);
+        this.ws.onerror = () => {};
+    }
+}
+
+function fetchLapData(carNo) {
+    return new Promise(resolve => {
+        if (lapData[carNo]) return resolve(lapData[carNo]);
+        const session = resultsData ? resultsData.SESSION : '';
+        const ws = new WebSocket(WS_URL);
+        ws.onopen = () => ws.send(JSON.stringify({eventId:EVENT_ID,eventPid:[7],clientLocalTime:Date.now(),session,startingNo:String(carNo)}));
+        ws.onmessage = (e) => { const m=JSON.parse(e.data); if(m.PID==='LTS_TIMESYNC')return; if(m.PID==='7'&&String(m.N)===String(carNo)){lapData[carNo]=m;ws.close();resolve(m);} };
+        ws.onerror = () => resolve(null);
+        setTimeout(()=>{ws.close();resolve(null);},15000);
+    });
+}
+
+// ── Helpers ──
+function formatGap(g){return !g||g==='----LAP 0'?'-':g;}
+function lapTimeToSeconds(t){if(!t||t==='')return Infinity;const p=t.split(':');if(p.length===3)return parseInt(p[0])*3600+parseInt(p[1])*60+parseFloat(p[2]);if(p.length===2)return parseInt(p[0])*60+parseFloat(p[1]);return parseFloat(p[0]);}
+function secondsToTime(s){if(!isFinite(s)||s<=0)return'-';if(s>=3600){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=(s%60).toFixed(3);return`${h}:${String(m).padStart(2,'0')}:${sc.padStart(6,'0')}`;}const m=Math.floor(s/60),sc=(s%60).toFixed(3);return`${m}:${sc.padStart(6,'0')}`;}
+function escH(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+
+// ── Driver-to-lap mapping ──
+function assignDriversToLaps(lapsMsg, carNo) {
+    const si = stintsData ? stintsData.STINTS.find(s=>s.STNR===carNo) : null;
+    if(!si||!si.DRIVERS||!lapsMsg||!lapsMsg.DATA) return null;
+    const data=lapsMsg.DATA, drivers=si.DRIVERS;
+    function s1Sec(s1){const p=s1.split(':');return p.length===2?parseInt(p[0])*60+parseFloat(p[1]):parseFloat(p[0]);}
+    const pitOut=new Set();
+    data.forEach((l,i)=>{if(i===0)return;if(s1Sec(l.S1)>120)pitOut.add(l.L);});
+    let segments=[],cur=[];
+    data.forEach(l=>{if(pitOut.has(l.L)&&cur.length>0){segments.push(cur);cur=[];}cur.push(l.L);});
+    if(cur.length>0)segments.push(cur);
+    const ds=drivers.map((d,idx)=>({name:`${d.PRENAME} ${d.NAME}`,totalLaps:parseInt(d.LAPS)||0,stintLaps:parseInt(d.STINTLAPS)||0,colorIdx:idx,id:d.ID}));
+    const segLens=segments.map(s=>s.length);
+    function solve(si,rem,asgn){
+        if(si>=segments.length)return rem.every(l=>l===0)?[...asgn]:null;
+        for(let di=0;di<rem.length;di++){if(rem[di]<=0)continue;let c=0;
+        for(let e=si;e<segments.length;e++){c+=segLens[e];if(c>rem[di])break;const nr=[...rem];nr[di]-=c;const na=[...asgn];for(let s=si;s<=e;s++)na[s]=di;const r=solve(e+1,nr,na);if(r)return r;}}return null;}
+    let sdm=null;
+    if(segments.length<=20&&drivers.length<=6) sdm=solve(0,ds.map(d=>d.totalLaps),new Array(segments.length).fill(-1));
+    if(!sdm){sdm=new Array(segments.length).fill(-1);const rem=ds.map(d=>d.totalLaps);let di=0;
+    for(let si=0;si<segments.length;si++){let found=false;for(let a=0;a<ds.length;a++){const t=(di+a)%ds.length;if(rem[t]>=segLens[si]){sdm[si]=t;rem[t]-=segLens[si];if(rem[t]===0)di=(t+1)%ds.length;found=true;break;}}
+    if(!found){const mx=rem.indexOf(Math.max(...rem));sdm[si]=mx;rem[mx]-=segLens[si];}}}
+    const ldm={};segments.forEach((seg,si)=>{const d=sdm[si]>=0&&sdm[si]<ds.length?ds[sdm[si]]:null;seg.forEach(ln=>{ldm[ln]=d;});});
+    return {lapDriverMap:ldm,driverStints:ds,segments,segmentDriverMap:sdm};
+}
+
+// ── Current stint info ──
+function getCurrentStintInfo(carNo) {
+    const si = stintsData ? stintsData.STINTS.find(s=>s.STNR===carNo) : null;
+    if (!si) return null;
+    const active = si.DRIVERS.find(d => d.STATUS === '2');
+    if (!active) return null;
+    const stintLaps = parseInt(active.STINTLAPS) || 0;
+    const totalDriverLaps = parseInt(active.LAPS) || 0;
+    const maxStintLaps = 8;
+    const remaining = Math.max(0, maxStintLaps - stintLaps);
+
+    // STINTTIME includes pit wait time, so use driver's TOTALTIME/LAPS for avg
+    const totalTimeSec = lapTimeToSeconds(active.TOTALTIME);
+    const driverAvg = totalDriverLaps > 0 && isFinite(totalTimeSec) ? totalTimeSec / totalDriverLaps : 0;
+
+    // If we have lap data cached, use last clean laps for better avg
+    const ld = lapData[carNo];
+    let recentAvg = 0;
+    if (ld && ld.DATA && ld.DATA.length > 0) {
+        const allTimes = ld.DATA.map(d => lapTimeToSeconds(d.T)).filter(t => isFinite(t));
+        const best = Math.min(...allTimes);
+        const clean = allTimes.filter(t => t < best * 1.3);
+        if (clean.length > 0) recentAvg = clean.reduce((a, b) => a + b, 0) / clean.length;
+    }
+
+    // Use the best available avg: lap data clean avg > driver total avg
+    const avgLap = recentAvg > 0 ? recentAvg : driverAvg;
+
+    const estStintTotal = avgLap > 0 ? avgLap * maxStintLaps : 0;
+    const estRemainingTime = avgLap > 0 ? avgLap * remaining : 0;
+
+    return {
+        driver: `${active.PRENAME} ${active.NAME}`,
+        stintLaps,
+        stintTime: active.STINTTIME || '-',
+        totalDriverLaps,
+        totalTime: active.TOTALTIME || '-',
+        estimatedRemaining: remaining,
+        maxStintLaps,
+        pct: Math.min(100, Math.round((stintLaps / maxStintLaps) * 100)),
+        avgLap: avgLap > 0 ? secondsToTime(avgLap) : '-',
+        estStintTotal: estStintTotal > 0 ? secondsToTime(estStintTotal) : '-',
+        estRemainingTime: estRemainingTime > 0 ? secondsToTime(estRemainingTime) : '-',
+    };
+}
+
+// ── Render: Leaderboard ──
+function renderLeaderboard() {
+    if (!resultsData) return;
+    const R = resultsData.RESULT;
+    let html = `<div class="lb-toolbar">
+        <button class="btn" onclick="showTrackMap()">🗺 Track Map</button>
+        <button class="btn ${compareMode?'active':''}" onclick="toggleCompareMode()">${compareMode?'Cancel Compare':'Compare'}</button>
+        ${compareMode?`<span class="compare-count">${compareSet.size} selected</span>
+        <button class="btn compare-go" ${compareSet.size<2?'disabled':''} onclick="showCompare()">Compare Selected</button>`:''}
+    </div>`;
+    html += `<table class="leaderboard-table"><thead><tr>
+        ${compareMode?'<th class="cb-cell"></th>':''}
+        <th>Pos</th><th>+/-</th><th>#</th><th>Team / Driver</th><th>Class</th><th>Car</th><th>Laps</th><th>Last Lap</th><th>Best Lap</th><th>Stint Avg</th><th>Race Avg</th><th>Gap</th><th>Pits</th>
+    </tr></thead><tbody>`;
+    R.forEach(r => {
+        const pc=r.POSITION<=3?`pos-${r.POSITION}`:'';
+        const cc=r.CHG>0?'chg-up':r.CHG<0?'chg-down':'';
+        const ct=r.CHG>0?`+${r.CHG}`:r.CHG<0?r.CHG:'';
+        const sel=compareSet.has(r.STNR);
+        // Stint avg: current driver's STINTTIME / STINTLAPS
+        let stintAvg='-', raceAvg='-';
+        const si=stintsData?stintsData.STINTS.find(s=>s.STNR===r.STNR):null;
+        if(si){
+            const active=si.DRIVERS.find(d=>d.STATUS==='2');
+            if(active){
+                const sl=parseInt(active.STINTLAPS)||0;
+                const st=lapTimeToSeconds(active.STINTTIME);
+                if(sl>0&&isFinite(st)) stintAvg=secondsToTime(st/sl);
+            }
+            // Race avg: sum of all drivers' TOTALTIME / sum of all drivers' LAPS
+            let totalSec=0, totalLaps=0;
+            si.DRIVERS.forEach(d=>{
+                const l=parseInt(d.LAPS)||0;
+                const t=lapTimeToSeconds(d.TOTALTIME);
+                if(l>0&&isFinite(t)){totalSec+=t;totalLaps+=l;}
+            });
+            if(totalLaps>0) raceAvg=secondsToTime(totalSec/totalLaps);
+        }
+        html += `<tr class="${sel?'selected-row':''}" onclick="${compareMode?`toggleCompare('${r.STNR}')`:`showCarDetail('${r.STNR}')`}">
+            ${compareMode?`<td class="cb-cell"><input type="checkbox" ${sel?'checked':''} onclick="event.stopPropagation();toggleCompare('${r.STNR}')"></td>`:''}
+            <td class="pos ${pc}">${r.POSITION}</td><td class="${cc}">${ct}</td>
+            <td><span class="car-num">${r.STNR}</span></td>
+            <td><div class="team-name">${escH(r.TEAM)}</div><div class="driver-name">${escH(r.NAME)}</div></td>
+            <td><span class="class-badge">${r.CLASSNAME}</span></td>
+            <td>${escH(r.CAR)}</td><td>${r.LAPS}</td>
+            <td style="font-family:monospace">${r.LASTLAPTIME||'-'}</td>
+            <td class="fastest" style="font-family:monospace">${r.FASTESTLAP||'-'}</td>
+            <td style="font-family:monospace;color:#06b6d4">${stintAvg}</td>
+            <td style="font-family:monospace;color:#94a3b8">${raceAvg}</td>
+            <td style="font-family:monospace">${formatGap(r.GAP)}</td>
+            <td>${r.PITSTOPCOUNT||0}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('app').innerHTML = html;
+}
+
+function toggleCompareMode() { compareMode=!compareMode; if(!compareMode)compareSet.clear(); renderLeaderboard(); }
+function toggleCompare(stnr) { compareSet.has(stnr)?compareSet.delete(stnr):compareSet.add(stnr); renderLeaderboard(); }
+
+// ── Render: Detail ──
+async function showCarDetail(carNo) {
+    currentView='detail'; currentCar=carNo;
+    const car=resultsData.RESULT.find(r=>r.STNR===carNo); if(!car)return;
+    const stint=stintsData?stintsData.STINTS.find(s=>s.STNR===carNo):null;
+    const cs=getCurrentStintInfo(carNo);
+
+    let csHtml='';
+    if(cs){
+        csHtml=`<div class="current-stint-box">
+            <div><div class="cs-label">Current Driver</div><div class="cs-value" style="color:#22c55e">${escH(cs.driver)}</div></div>
+            <div><div class="cs-label">Stint Laps</div><div class="cs-value">${cs.stintLaps} / ~${cs.maxStintLaps}</div></div>
+            <div><div class="cs-label">Stint Time</div><div class="cs-value">${cs.stintTime}</div></div>
+            <div><div class="cs-label">Avg Lap</div><div class="cs-value" style="color:#06b6d4">${cs.avgLap}</div></div>
+            <div><div class="cs-label">Est. Stint Total</div><div class="cs-value" style="color:#94a3b8">${cs.estStintTotal}</div></div>
+            <div><div class="cs-label">Est. Remaining</div><div class="cs-value" style="color:#f59e0b">${cs.estimatedRemaining} laps (~${cs.estRemainingTime})</div></div>
+            <div class="cs-progress">
+                <div class="cs-label">Stint Progress (~${cs.maxStintLaps} lap max)</div>
+                <div class="cs-progress-bar"><div class="cs-progress-fill" style="width:${cs.pct}%"></div></div>
+            </div>
+        </div>`;
+    }
+
+    document.getElementById('app').innerHTML = `
+        <button class="back-btn" onclick="goBack()">&#8592; Back to Leaderboard</button>
+        <div class="detail-header">
+            <h2>#${car.STNR} ${escH(car.TEAM)}</h2>
+            <div class="meta">
+                <span><strong>Position:</strong> ${car.POSITION}</span>
+                <span><strong>Class:</strong> ${car.CLASSNAME} (P${car.CLASSRANK})</span>
+                <span><strong>Car:</strong> ${escH(car.CAR)}</span>
+                <span><strong>Laps:</strong> ${car.LAPS}</span>
+                <span><strong>Best Lap:</strong> ${car.FASTESTLAP||'-'}</span>
+                <span><strong>Pit Stops:</strong> ${car.PITSTOPCOUNT||0}</span>
+            </div>
+            ${csHtml}
+            <div style="margin-top:14px">
+                <button class="back-btn" style="margin:0" onclick="openQuickCompare('${car.STNR}')">Compare with...</button>
+                <div id="quick-compare-panel"></div>
+            </div>
+        </div>
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('laps')">Lap Times</div>
+            <div class="tab" onclick="switchTab('stints')">Stints & Drivers</div>
+            <div class="tab" onclick="switchTab('chart')">Lap Chart</div>
+        </div>
+        <div id="tab-laps" class="tab-content active"><div class="loading"><div class="spinner"></div>Loading lap data...</div></div>
+        <div id="tab-stints" class="tab-content">${renderStints(stint,car)}</div>
+        <div id="tab-chart" class="tab-content"><div class="loading"><div class="spinner"></div>Loading lap chart...</div></div>`;
+
+    const laps=await fetchLapData(carNo);
+    const dm=assignDriversToLaps(laps,carNo);
+    renderLapTimes(laps,car,dm); renderLapChart(laps,car,dm); analyzeStints(laps,car,dm);
+}
+
+function renderDriverLegend(ds){if(!ds)return'';let h='<div class="driver-legend">';ds.forEach((d,i)=>{const c=DRIVER_COLORS[i%DRIVER_COLORS.length];h+=`<div class="driver-legend-item"><div class="driver-color-dot" style="background:${c.border}"></div><span style="color:${c.name}">${escH(d.name)}</span><span style="color:#64748b;font-size:0.7rem;">(${d.totalLaps} laps)</span></div>`;});return h+'</div>';}
+
+function renderLapTimes(laps,car,dm){
+    const ct=document.getElementById('tab-laps');
+    if(!laps||!laps.DATA||!laps.DATA.length){ct.innerHTML='<p style="color:#64748b;padding:20px;">No lap data</p>';return;}
+    const D=laps.DATA,best=Math.min(...D.map(d=>lapTimeToSeconds(d.T)));
+    const vt=D.map(d=>lapTimeToSeconds(d.T)).filter(t=>isFinite(t)&&t<best*1.5);
+    const avg=vt.reduce((a,b)=>a+b,0)/vt.length;
+    let h=`<div class="stats-grid">
+        <div class="stat-card"><div class="label">Best Lap</div><div class="value" style="color:#a855f7">${car.FASTESTLAP||secondsToTime(best)}</div></div>
+        <div class="stat-card"><div class="label">Average Lap (clean)</div><div class="value">${secondsToTime(avg)}</div></div>
+        <div class="stat-card"><div class="label">Total Laps</div><div class="value">${D.length}</div></div>
+        <div class="stat-card"><div class="label">Pit Stops</div><div class="value">${car.PITSTOPCOUNT||0}</div></div>
+    </div>`;
+    if(dm) h+=renderDriverLegend(dm.driverStints);
+    h+='<div class="laps-grid">';
+    D.forEach(lap=>{const t=lapTimeToSeconds(lap.T),ib=t===best,ip=t>best*1.3,cc=ib?'best-lap':ip?'pit-lap':'';
+        const dr=dm?dm.lapDriverMap[lap.L]:null,co=dr?DRIVER_COLORS[dr.colorIdx%DRIVER_COLORS.length]:null;
+        h+=`<div class="lap-card ${cc}" style="border-left-color:${co?co.border:'#334155'}"><div class="lap-num">Lap ${lap.L}</div><div class="lap-time">${lap.T}</div><div class="lap-driver" style="color:${co?co.name:'#64748b'}">${dr?escH(dr.name):''}</div></div>`;});
+    ct.innerHTML=h+'</div>';
+}
+
+function renderLapChart(laps,car,dm){
+    const ct=document.getElementById('tab-chart');
+    if(!laps||!laps.DATA||!laps.DATA.length){ct.innerHTML='<p style="color:#64748b;padding:20px;">No data</p>';return;}
+    const D=laps.DATA,best=Math.min(...D.map(d=>lapTimeToSeconds(d.T)));
+    let h='';if(dm)h+=renderDriverLegend(dm.driverStints);
+    h+=`<div class="lap-chart-container"><table class="lap-chart-table"><thead><tr><th>Lap</th><th>Driver</th><th>Time</th><th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>S5</th><th>S6</th><th>S7</th><th>S8</th><th>S9</th><th>Top Speed</th></tr></thead><tbody>`;
+    D.forEach(l=>{const t=lapTimeToSeconds(l.T),ib=t===best,dr=dm?dm.lapDriverMap[l.L]:null,co=dr?DRIVER_COLORS[dr.colorIdx%DRIVER_COLORS.length]:null;
+        h+=`<tr style="${ib?'color:#a855f7;font-weight:600':''}"><td>${l.L}</td><td style="color:${co?co.name:'#64748b'};font-family:sans-serif;font-size:.75rem">${dr?escH(dr.name):'-'}</td><td>${l.T}</td><td>${l.S1||'-'}</td><td>${l.S2||'-'}</td><td>${l.S3||'-'}</td><td>${l.S4||'-'}</td><td>${l.S5||'-'}</td><td>${l.S6||'-'}</td><td>${l.S7||'-'}</td><td>${l.S8||'-'}</td><td>${l.S9||'-'}</td><td>${Math.max(l.V1||0,l.V2||0,l.V3||0,l.V4||0,l.V5||0,l.V6||0,l.V7||0,l.V8||0,l.V9||0)} km/h</td></tr>`;});
+    ct.innerHTML=h+'</tbody></table></div>';
+}
+
+function renderStints(stint,car){
+    if(!stint||!stint.DRIVERS)return'<p style="color:#64748b;padding:20px;">No stint data</p>';
+    const D=stint.DRIVERS,tl=parseInt(car.LAPS)||1;
+    let h='<h3 style="color:#94a3b8;margin-bottom:12px;font-size:.9rem">Driver Summary</h3><div class="stats-grid">';
+    D.forEach((d,i)=>{const pct=Math.round((parseInt(d.LAPS)/tl)*100),st=d.STATUS==='2'?'On Track':d.STATUS==='1'?'Resting':'Garage',sc=d.STATUS==='2'?'#22c55e':'#f59e0b',c=DRIVER_COLORS[i%DRIVER_COLORS.length];
+        h+=`<div class="stat-card" style="border-left:4px solid ${c.border}"><div class="label" style="color:${c.name}">${escH(d.PRENAME)} ${escH(d.NAME)}</div><div class="value">${d.LAPS} laps</div><div style="color:#64748b;font-size:.75rem;margin-top:4px">${pct}% | Stint: ${d.STINTLAPS} laps</div><div class="stint-bar"><div class="stint-bar-fill" style="width:${pct}%;background:${c.border}"></div></div><div style="margin-top:6px;font-size:.75rem"><span style="color:${sc}">${st}</span>${d.RESTTIME?` | Rest: ${d.RESTTIME}`:''}</div></div>`;});
+    h+='</div><h3 style="color:#94a3b8;margin:20px 0 12px;font-size:.9rem">Driver Details</h3>';
+    h+='<table class="stints-table"><thead><tr><th>Driver</th><th>Total Laps</th><th>Current Stint</th><th>Total Drive Time</th><th>Current Stint Time</th><th>Rest Time</th><th>Status</th></tr></thead><tbody>';
+    D.forEach(d=>{const st=d.STATUS==='2'?'On Track':d.STATUS==='1'?'Resting':d.STATUS,sc=d.STATUS==='2'?'#22c55e':'#f59e0b';
+        h+=`<tr><td class="stint-driver">${escH(d.PRENAME)} ${escH(d.NAME)}</td><td>${d.LAPS}</td><td>${d.STINTLAPS} laps</td><td style="font-family:monospace">${d.TOTALTIME||'-'}</td><td style="font-family:monospace">${d.STINTTIME||'-'}</td><td style="font-family:monospace">${d.RESTTIME||'-'}</td><td style="color:${sc}">${st}</td></tr>`;});
+    h+='</tbody></table><div id="stint-breakdown" style="margin-top:24px"><h3 style="color:#94a3b8;margin-bottom:12px;font-size:.9rem">Stint Breakdown</h3><p style="color:#475569;font-size:.8rem">Loading...</p></div>';
+    return h;
+}
+
+function analyzeStints(laps,car,dm){
+    if(!laps||!laps.DATA||!laps.DATA.length)return;
+    const D=laps.DATA,times=D.map(d=>lapTimeToSeconds(d.T)),ct=times.filter(t=>isFinite(t)).sort((a,b)=>a-b);
+    const med=ct[Math.floor(ct.length*.3)],pth=med*1.4;
+    let segs,sdm;
+    if(dm){segs=dm.segments;sdm=dm.segmentDriverMap;}else{segs=[];let c=[];D.forEach((l,i)=>{const t=lapTimeToSeconds(l.T);if(t>pth&&i>0&&c.length>0){segs.push(c);c=[];}c.push(l.L);});if(c.length>0)segs.push(c);sdm=new Array(segs.length).fill(-1);}
+    const el=document.getElementById('stint-breakdown');if(!el)return;
+    let h=`<h3 style="color:#94a3b8;margin-bottom:12px;font-size:.9rem">Stint Breakdown (${segs.length} stints)</h3><table class="stints-table"><thead><tr><th>Stint</th><th>Driver</th><th>Laps</th><th>Lap Range</th><th>Avg Lap</th><th>Best Lap</th><th>Worst Lap</th><th>Consistency</th></tr></thead><tbody>`;
+    segs.forEach((seg,i)=>{const st=seg.map(ln=>{const l=D.find(d=>d.L===ln);return l?lapTimeToSeconds(l.T):0;}).filter(t=>t>0&&t<pth);
+        const avg=st.length?st.reduce((a,b)=>a+b,0)/st.length:0,best=st.length?Math.min(...st):0,worst=st.length?Math.max(...st):0;
+        const con=st.length>1?Math.sqrt(st.reduce((s,t)=>s+Math.pow(t-avg,2),0)/st.length):0;
+        const di=sdm[i],dr=dm&&di>=0?dm.driverStints[di]:null,co=dr?DRIVER_COLORS[dr.colorIdx%DRIVER_COLORS.length]:null;
+        h+=`<tr><td style="font-weight:600">Stint ${i+1}</td><td style="color:${co?co.name:'#64748b'};font-weight:500">${dr?escH(dr.name):'?'}</td><td>${seg.length}</td><td>Lap ${seg[0]}-${seg[seg.length-1]}</td><td style="font-family:monospace">${secondsToTime(avg)}</td><td style="font-family:monospace;color:#a855f7">${secondsToTime(best)}</td><td style="font-family:monospace;color:#f59e0b">${secondsToTime(worst)}</td><td style="font-family:monospace">${con.toFixed(1)}s</td></tr>`;});
+    el.innerHTML=h+'</tbody></table>';
+}
+
+// ── Compare view ──
+const CMP_SECTIONS = [
+    {id:'overview',label:'Overview'},
+    {id:'laptimes',label:'Lap Times'},
+    {id:'sectors',label:'Sectors & Speed'},
+    {id:'stints',label:'Stints & Drivers'},
+    {id:'pitstops',label:'Pit Stops'},
+];
+let cmpActive = new Set(['overview','laptimes','sectors','stints','pitstops']);
+
+// ── Quick Compare from detail page ──
+let qcOpen = false, qcSelected = new Set();
+
+function openQuickCompare(currentCarNo) {
+    const panel = document.getElementById('quick-compare-panel');
+    if (qcOpen) { panel.innerHTML = ''; qcOpen = false; return; }
+    qcOpen = true;
+    qcSelected.clear();
+    const R = resultsData.RESULT.filter(r => r.STNR !== currentCarNo);
+    panel.innerHTML = `<div class="qc-panel">
+        <input class="qc-search" placeholder="Search team, driver, #..." oninput="filterQcList('${currentCarNo}', this.value)">
+        <div class="qc-list" id="qc-list">${buildQcList(R)}</div>
+        <button class="qc-go" id="qc-go-btn" disabled onclick="runQuickCompare('${currentCarNo}')">Compare</button>
+        <div class="qc-result" id="qc-result"></div>
+    </div>`;
+}
+
+function buildQcList(items) {
+    return items.map(r =>
+        `<label class="qc-item"><input type="checkbox" ${qcSelected.has(r.STNR)?'checked':''} onchange="toggleQcItem('${r.STNR}')"><span class="qc-num">#${r.STNR}</span><span class="qc-team">${escH(r.TEAM)}</span><span class="qc-pos">P${r.POSITION} ${escH(r.NAME)}</span></label>`
+    ).join('');
+}
+
+function filterQcList(currentCarNo, query) {
+    const q = query.toLowerCase();
+    const R = resultsData.RESULT.filter(r => r.STNR !== currentCarNo && (
+        r.TEAM.toLowerCase().includes(q) || r.NAME.toLowerCase().includes(q) ||
+        r.STNR.includes(q) || r.CAR.toLowerCase().includes(q) || r.CLASSNAME.toLowerCase().includes(q)
+    ));
+    document.getElementById('qc-list').innerHTML = buildQcList(R);
+}
+
+function toggleQcItem(stnr) {
+    qcSelected.has(stnr) ? qcSelected.delete(stnr) : qcSelected.add(stnr);
+    const btn = document.getElementById('qc-go-btn');
+    if (btn) btn.disabled = qcSelected.size === 0;
+}
+
+function runQuickCompare(currentCarNo) {
+    const allNos = [currentCarNo, ...qcSelected];
+    const cars = allNos.map(n => resultsData.RESULT.find(r => r.STNR === n)).filter(Boolean);
+    const stints = allNos.map(n => stintsData ? stintsData.STINTS.find(s => s.STNR === n) : null);
+    if (cars.length < 2) return;
+
+    const panel = document.getElementById('qc-result');
+    if (!panel) return;
+
+    // Build comparison of header info
+    let h = `<table class="cmp-table"><thead><tr><th>Metric</th>${cars.map((c,i) =>
+        `<th style="color:${CAR_COLORS[i%CAR_COLORS.length]}">#${c.STNR} ${escH(c.TEAM)}</th>`
+    ).join('')}</tr></thead><tbody>`;
+
+    const rows = [
+        ['Position', cars.map(c => c.POSITION), 'min'],
+        ['Class', cars.map(c => c.CLASSNAME), null],
+        ['Class Position', cars.map(c => c.CLASSRANK), 'min'],
+        ['Car', cars.map(c => escH(c.CAR)), null],
+        ['Current Driver', cars.map(c => escH(c.NAME)), null],
+        ['Laps', cars.map(c => c.LAPS), 'max'],
+        ['Best Lap', cars.map(c => c.FASTESTLAP || '-'), 'min_time'],
+        ['Last Lap', cars.map(c => c.LASTLAPTIME || '-'), 'min_time'],
+        ['Pit Stops', cars.map(c => c.PITSTOPCOUNT || '0'), 'min'],
+        ['Total Pit Time', cars.map(c => c.TPST || '-'), 'min_time'],
+        ['Gap to Leader', cars.map(c => formatGap(c.GAP)), null],
+        ['Leading Laps', cars.map(c => c.LLT || '0'), 'max'],
+    ];
+
+    // Stint avg & Race avg
+    const stintAvgs = stints.map(s => {
+        if (!s) return '-';
+        const a = s.DRIVERS.find(d => d.STATUS === '2');
+        if (!a) return '-';
+        const sl = parseInt(a.STINTLAPS) || 0, st = lapTimeToSeconds(a.STINTTIME);
+        return sl > 0 && isFinite(st) ? secondsToTime(st / sl) : '-';
+    });
+    const raceAvgs = stints.map(s => {
+        if (!s) return '-';
+        let ts = 0, tl = 0;
+        s.DRIVERS.forEach(d => { const l = parseInt(d.LAPS) || 0, t = lapTimeToSeconds(d.TOTALTIME); if (l > 0 && isFinite(t)) { ts += t; tl += l; } });
+        return tl > 0 ? secondsToTime(ts / tl) : '-';
+    });
+
+    rows.push(['Stint Avg', stintAvgs, 'min_time']);
+    rows.push(['Race Avg', raceAvgs, 'min_time']);
+
+    // Current stint info
+    const csLaps = stints.map(s => {
+        if (!s) return '-';
+        const a = s.DRIVERS.find(d => d.STATUS === '2');
+        return a ? a.STINTLAPS : '-';
+    });
+    const csTime = stints.map(s => {
+        if (!s) return '-';
+        const a = s.DRIVERS.find(d => d.STATUS === '2');
+        return a ? (a.STINTTIME || '-') : '-';
+    });
+    rows.push(['Current Stint Laps', csLaps, null]);
+    rows.push(['Current Stint Time', csTime, null]);
+
+    rows.forEach(([label, vals, mode]) => { h += cmpRow(label, vals, mode); });
+    h += '</tbody></table>';
+    panel.innerHTML = h;
+}
+
+async function showCompare() {
+    currentView='compare';
+    const carNos=[...compareSet];
+    const cars=carNos.map(n=>resultsData.RESULT.find(r=>r.STNR===n)).filter(Boolean);
+    if(cars.length<2) return;
+
+    document.getElementById('app').innerHTML=`<button class="back-btn" onclick="goBack()">&#8592; Back to Leaderboard</button><div class="loading"><div class="spinner"></div>Loading comparison data for ${cars.length} cars...</div>`;
+
+    // Fetch all lap data in parallel
+    const lapResults = await Promise.all(carNos.map(n=>fetchLapData(n)));
+    const stintResults = carNos.map(n=>stintsData?stintsData.STINTS.find(s=>s.STNR===n):null);
+
+    let html=`<button class="back-btn" onclick="goBack()">&#8592; Back to Leaderboard</button>
+        <h2 style="margin-bottom:16px">Comparison: ${cars.map(c=>'#'+c.STNR+' '+escH(c.TEAM)).join(' vs ')}</h2>
+        <div class="cmp-filter" id="cmpFilter"></div><div id="cmpContent"></div>`;
+    document.getElementById('app').innerHTML=html;
+
+    renderCmpFilter();
+    renderCmpContent(cars,carNos,lapResults,stintResults);
+}
+
+function renderCmpFilter(){
+    const el=document.getElementById('cmpFilter');if(!el)return;
+    el.innerHTML=CMP_SECTIONS.map(s=>`<div class="chip ${cmpActive.has(s.id)?'on':''}" onclick="toggleCmpSection('${s.id}')">${s.label}</div>`).join('');
+}
+
+function toggleCmpSection(id){
+    cmpActive.has(id)?cmpActive.delete(id):cmpActive.add(id);
+    renderCmpFilter();
+    // Re-render content
+    document.querySelectorAll('.cmp-section').forEach(el=>{
+        el.style.display=cmpActive.has(el.dataset.section)?'block':'none';
+    });
+}
+
+function cmpStintProgressRows(stintResults,lapResults,carNos){
+    let h='';
+    h+=cmpRow('Current Driver',stintResults.map(s=>{if(!s)return'-';const a=s.DRIVERS.find(d=>d.STATUS==='2');return a?`${a.PRENAME} ${a.NAME}`:'-';}),null);
+    h+=cmpRow('Stint Laps',stintResults.map(s=>{if(!s)return'-';const a=s.DRIVERS.find(d=>d.STATUS==='2');if(!a)return'-';const sl=parseInt(a.STINTLAPS)||0;return`${sl} / ~8`;}),null);
+    h+=cmpRow('Stint Remaining',stintResults.map(s=>{if(!s)return'-';const a=s.DRIVERS.find(d=>d.STATUS==='2');if(!a)return'-';const sl=parseInt(a.STINTLAPS)||0;const rem=Math.max(0,8-sl);return`${rem} laps`;}),null);
+    h+=cmpRow('Avg Lap',carNos.map((n,i)=>{const lr=lapResults[i];if(!lr||!lr.DATA||!lr.DATA.length)return'-';const ts=lr.DATA.map(d=>lapTimeToSeconds(d.T)).filter(t=>isFinite(t));const best=Math.min(...ts);const clean=ts.filter(t=>t<best*1.3);return clean.length?secondsToTime(clean.reduce((a,b)=>a+b,0)/clean.length):'-';}),'min_time');
+    h+=cmpRow('Est. Remaining Time',stintResults.map((s,i)=>{if(!s)return'-';const a=s.DRIVERS.find(d=>d.STATUS==='2');if(!a)return'-';const sl=parseInt(a.STINTLAPS)||0;const rem=Math.max(0,8-sl);if(!rem)return'0:00.000';const lr=lapResults[i];let avg=0;if(lr&&lr.DATA&&lr.DATA.length){const ts=lr.DATA.map(d=>lapTimeToSeconds(d.T)).filter(t=>isFinite(t));const best=Math.min(...ts);const clean=ts.filter(t=>t<best*1.3);if(clean.length)avg=clean.reduce((a,b)=>a+b,0)/clean.length;}if(!avg){const tl=parseInt(a.LAPS)||0;const tt=lapTimeToSeconds(a.TOTALTIME);if(tl>0&&isFinite(tt))avg=tt/tl;}return avg>0?secondsToTime(avg*rem):'-';}),'min_time');
+    h+=cmpRow('Stint Progress',stintResults.map(s=>{if(!s)return'-';const a=s.DRIVERS.find(d=>d.STATUS==='2');if(!a)return'-';const sl=parseInt(a.STINTLAPS)||0;const pct=Math.min(100,Math.round((sl/8)*100));return`<div style="display:flex;align-items:center;gap:8px"><div class="cs-progress-bar" style="flex:1;min-width:80px"><div class="cs-progress-fill" style="width:${pct}%"></div></div><span style="font-size:.75rem;color:#94a3b8">${pct}%</span></div>`;}),null);
+    return h;
+}
+function renderCmpContent(cars,carNos,lapResults,stintResults){
+    const el=document.getElementById('cmpContent');if(!el)return;
+    let h='';
+
+    // ── Overview ──
+    h+=`<div class="cmp-section" data-section="overview" style="${cmpActive.has('overview')?'':'display:none'}">
+        <h3>Overview</h3><table class="cmp-table"><thead><tr><th>Metric</th>${cars.map((c,i)=>`<th style="color:${CAR_COLORS[i%CAR_COLORS.length]}">#${c.STNR} ${escH(c.TEAM)}</th>`).join('')}</tr></thead><tbody>`;
+    const oRows=[
+        ['Position',cars.map(c=>c.POSITION),'min'],
+        ['Class Position',cars.map(c=>c.CLASSRANK),'min'],
+        ['Class',cars.map(c=>c.CLASSNAME),null],
+        ['Car',cars.map(c=>escH(c.CAR)),null],
+        ['Current Driver',cars.map(c=>escH(c.NAME)),null],
+        ['Total Laps',cars.map(c=>c.LAPS),'max'],
+        ['Best Lap',cars.map(c=>c.FASTESTLAP||'-'),'min_time'],
+        ['Last Lap',cars.map(c=>c.LASTLAPTIME||'-'),'min_time'],
+        ['Gap to Leader',cars.map(c=>formatGap(c.GAP)),null],
+        ['Pit Stops',cars.map(c=>c.PITSTOPCOUNT||'0'),'min'],
+        ['Total Pit Time',cars.map(c=>c.TPST||'-'),'min_time'],
+        ['Leading Laps (Total)',cars.map(c=>c.LLT||'0'),'max'],
+        ['Leading Laps (Class)',cars.map(c=>c.LLC||'0'),'max'],
+    ];
+    oRows.forEach(([label,vals,mode])=>{h+=cmpRow(label,vals,mode);});
+    // Average clean lap from lap data
+    const avgLaps=lapResults.map(lr=>{if(!lr||!lr.DATA)return'-';const ts=lr.DATA.map(d=>lapTimeToSeconds(d.T)),best=Math.min(...ts),vt=ts.filter(t=>isFinite(t)&&t<best*1.5);return vt.length?secondsToTime(vt.reduce((a,b)=>a+b,0)/vt.length):'-';});
+    h+=cmpRow('Avg Lap (clean)',avgLaps,'min_time');
+    // Stint avg & Race avg from stint data
+    const stintAvgs=stintResults.map(s=>{if(!s)return'-';const a=s.DRIVERS.find(d=>d.STATUS==='2');if(!a)return'-';const sl=parseInt(a.STINTLAPS)||0,st=lapTimeToSeconds(a.STINTTIME);return sl>0&&isFinite(st)?secondsToTime(st/sl):'-';});
+    h+=cmpRow('Stint Avg',stintAvgs,'min_time');
+    const raceAvgs=stintResults.map(s=>{if(!s)return'-';let ts=0,tl=0;s.DRIVERS.forEach(d=>{const l=parseInt(d.LAPS)||0,t=lapTimeToSeconds(d.TOTALTIME);if(l>0&&isFinite(t)){ts+=t;tl+=l;}});return tl>0?secondsToTime(ts/tl):'-';});
+    h+=cmpRow('Race Avg',raceAvgs,'min_time');
+    h+=`<tr><td colspan="${cars.length+1}" style="background:#0f172a;color:#64748b;font-size:.72rem;text-transform:uppercase;padding:6px 10px">Current Stint</td></tr>`;
+    h+=cmpStintProgressRows(stintResults,lapResults,carNos);
+    h+='</tbody></table></div>';
+
+    // ── Lap Times side-by-side ──
+    h+=`<div class="cmp-section" data-section="laptimes" style="${cmpActive.has('laptimes')?'':'display:none'}">
+        <h3>Lap Times</h3><div style="overflow-x:auto"><table class="cmp-table"><thead><tr><th>Lap</th>${cars.map((c,i)=>`<th style="color:${CAR_COLORS[i%CAR_COLORS.length]}">#${c.STNR}</th>`).join('')}</tr></thead><tbody>`;
+    const maxLap=Math.max(...lapResults.map(lr=>lr&&lr.DATA?lr.DATA.length:0));
+    for(let l=1;l<=maxLap;l++){
+        const vals=lapResults.map(lr=>{if(!lr||!lr.DATA)return'-';const lap=lr.DATA.find(d=>d.L===l);return lap?lap.T:'-';});
+        h+=cmpRow(`Lap ${l}`,vals,'min_time');
+    }
+    h+=`<tr><td colspan="${cars.length+1}" style="background:#0f172a;color:#64748b;font-size:.72rem;text-transform:uppercase;padding:6px 10px">Current Stint</td></tr>`;
+    h+=cmpStintProgressRows(stintResults,lapResults,carNos);
+    h+='</tbody></table></div></div>';
+
+    // ── Sectors & Speed ──
+    h+=`<div class="cmp-section" data-section="sectors" style="${cmpActive.has('sectors')?'':'display:none'}">
+        <h3>Sectors & Top Speed (Current Lap)</h3><table class="cmp-table"><thead><tr><th>Sector</th>${cars.map((c,i)=>`<th style="color:${CAR_COLORS[i%CAR_COLORS.length]}">#${c.STNR}</th>`).join('')}</tr></thead><tbody>`;
+    for(let s=1;s<=9;s++){
+        h+=cmpRow(`S${s} Time`,cars.map(c=>c[`S${s}TIME`]||'-'),'min_time');
+        h+=cmpRow(`S${s} Speed`,cars.map(c=>(c[`S${s}SPEED`]||'0')+' km/h'),'max_speed');
+    }
+    // Best sectors from lap data
+    h+='</tbody></table><h3 style="margin-top:16px">Best Sector Times (All Race)</h3><table class="cmp-table"><thead><tr><th>Sector</th>'+cars.map((c,i)=>`<th style="color:${CAR_COLORS[i%CAR_COLORS.length]}">#${c.STNR}</th>`).join('')+'</tr></thead><tbody>';
+    for(let s=1;s<=9;s++){
+        const vals=lapResults.map(lr=>{if(!lr||!lr.DATA)return'-';let best=Infinity;lr.DATA.forEach(l=>{const v=lapTimeToSeconds(l['S'+s]);if(v<best)best=v;});return isFinite(best)?secondsToTime(best):'-';});
+        h+=cmpRow(`Best S${s}`,vals,'min_time');
+    }
+    // Top speed from all laps
+    const topSpeeds=lapResults.map(lr=>{if(!lr||!lr.DATA)return'-';let mx=0;lr.DATA.forEach(l=>{for(let s=1;s<=9;s++){const v=l['V'+s]||0;if(v>mx)mx=v;}});return mx?mx+' km/h':'-';});
+    h+=cmpRow('Top Speed (Race)',topSpeeds,'max_speed');
+    h+=`<tr><td colspan="${cars.length+1}" style="background:#0f172a;color:#64748b;font-size:.72rem;text-transform:uppercase;padding:6px 10px">Current Stint</td></tr>`;
+    h+=cmpStintProgressRows(stintResults,lapResults,carNos);
+    h+='</tbody></table></div>';
+
+    // ── Stints & Drivers ──
+    h+=`<div class="cmp-section" data-section="stints" style="${cmpActive.has('stints')?'':'display:none'}">
+        <h3>Drivers & Stints</h3><table class="cmp-table"><thead><tr><th>Info</th>${cars.map((c,i)=>`<th style="color:${CAR_COLORS[i%CAR_COLORS.length]}">#${c.STNR}</th>`).join('')}</tr></thead><tbody>`;
+    const maxDrivers=Math.max(...stintResults.map(s=>s&&s.DRIVERS?s.DRIVERS.length:0));
+    // Current stint progress
+    h+=cmpRow('Current Stint Time',stintResults.map(s=>{if(!s)return'-';const a=s.DRIVERS.find(d=>d.STATUS==='2');return a?a.STINTTIME:'-';}),null);
+    h+=cmpStintProgressRows(stintResults,lapResults,carNos);
+    for(let di=0;di<maxDrivers;di++){
+        h+=`<tr><td colspan="${cars.length+1}" style="background:#0f172a;color:#64748b;font-size:.72rem;text-transform:uppercase;padding:6px 10px">Driver ${di+1}</td></tr>`;
+        h+=cmpRow('Name',stintResults.map(s=>{const d=s&&s.DRIVERS&&s.DRIVERS[di];return d?`${d.PRENAME} ${d.NAME}`:'-';}),null);
+        h+=cmpRow('Total Laps',stintResults.map(s=>{const d=s&&s.DRIVERS&&s.DRIVERS[di];return d?d.LAPS:'-';}),'max');
+        h+=cmpRow('Total Drive Time',stintResults.map(s=>{const d=s&&s.DRIVERS&&s.DRIVERS[di];return d?d.TOTALTIME||'-':'-';}),'min_time');
+        h+=cmpRow('Stint Time',stintResults.map(s=>{const d=s&&s.DRIVERS&&s.DRIVERS[di];return d?d.STINTTIME||'-':'-';}),null);
+        h+=cmpRow('Rest Time',stintResults.map(s=>{const d=s&&s.DRIVERS&&s.DRIVERS[di];return d?d.RESTTIME||'-':'-';}),null);
+        h+=cmpRow('Status',stintResults.map(s=>{const d=s&&s.DRIVERS&&s.DRIVERS[di];return d?(d.STATUS==='2'?'On Track':'Resting'):'-';}),null);
+    }
+    h+='</tbody></table></div>';
+
+    // ── Pit Stops ──
+    h+=`<div class="cmp-section" data-section="pitstops" style="${cmpActive.has('pitstops')?'':'display:none'}">
+        <h3>Pit Stops</h3><table class="cmp-table"><thead><tr><th>Metric</th>${cars.map((c,i)=>`<th style="color:${CAR_COLORS[i%CAR_COLORS.length]}">#${c.STNR}</th>`).join('')}</tr></thead><tbody>`;
+    h+=cmpRow('Pit Stop Count',cars.map(c=>c.PITSTOPCOUNT||'0'),'min');
+    h+=cmpRow('Total Pit Time',cars.map(c=>c.TPST||'-'),'min_time');
+    // Avg pit time
+    h+=cmpRow('Avg Pit Time',cars.map(c=>{const cnt=parseInt(c.PITSTOPCOUNT)||0;if(!cnt||!c.TPST)return'-';const total=lapTimeToSeconds(c.TPST);return isFinite(total)?secondsToTime(total/cnt):'-';}),'min_time');
+    // Stint counts from lap data
+    const stintCounts=lapResults.map((lr,idx)=>{
+        if(!lr||!lr.DATA)return'-';
+        const dm=assignDriversToLaps(lr,carNos[idx]);
+        return dm?String(dm.segments.length):'-';
+    });
+    h+=cmpRow('Stints (detected)',stintCounts,null);
+    h+=`<tr><td colspan="${cars.length+1}" style="background:#0f172a;color:#64748b;font-size:.72rem;text-transform:uppercase;padding:6px 10px">Current Stint</td></tr>`;
+    h+=cmpStintProgressRows(stintResults,lapResults,carNos);
+    h+='</tbody></table></div>';
+
+    el.innerHTML=h;
+}
+
+function cmpRow(label,vals,mode){
+    let bestIdx=-1;
+    if(mode==='min'){const nums=vals.map(v=>parseFloat(v));const mn=Math.min(...nums.filter(n=>!isNaN(n)));bestIdx=nums.indexOf(mn);}
+    if(mode==='max'){const nums=vals.map(v=>parseFloat(v));const mx=Math.max(...nums.filter(n=>!isNaN(n)&&n>0));bestIdx=nums.indexOf(mx);}
+    if(mode==='min_time'){const secs=vals.map(v=>lapTimeToSeconds(v));const mn=Math.min(...secs.filter(s=>isFinite(s)&&s>0));bestIdx=secs.indexOf(mn);}
+    if(mode==='max_speed'){const nums=vals.map(v=>parseFloat(v));const mx=Math.max(...nums.filter(n=>!isNaN(n)&&n>0));bestIdx=nums.indexOf(mx);}
+    let r=`<tr><td>${label}</td>`;
+    vals.forEach((v,i)=>{r+=`<td class="${i===bestIdx?'cmp-best':''}">${v}</td>`;});
+    return r+'</tr>';
+}
+
+function switchTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));event.target.classList.add('active');document.getElementById('tab-'+n).classList.add('active');}
+
+// ── Track Map & Traffic Prediction ──
+// Nürburgring combined layout (GP + Nordschleife) approximation as SVG path points
+// 9 sectors mapped to positions along the track
+const TRACK_POINTS = [
+    // Sector boundaries as [x,y] on a 900x500 canvas — approximation of Nordschleife+GP
+    // The path goes clockwise from start/finish
+    {x:450,y:460}, // S/F line (sector 1 start)
+    {x:520,y:450},{x:580,y:420},{x:640,y:380},{x:680,y:340}, // S1: GP section
+    {x:700,y:290},{x:710,y:240},{x:700,y:190}, // S2: into Nordschleife
+    {x:670,y:150},{x:630,y:120},{x:580,y:100},{x:520,y:80}, // S3: Hatzenbach/Hocheichen
+    {x:460,y:65},{x:400,y:55},{x:340,y:50},{x:280,y:55}, // S4: Flugplatz area
+    {x:220,y:70},{x:170,y:95},{x:140,y:130},{x:120,y:170}, // S5: Schwedenkreuz/Aremberg
+    {x:105,y:220},{x:100,y:270},{x:110,y:320}, // S6: Karussell area
+    {x:130,y:360},{x:160,y:390},{x:200,y:410},{x:250,y:420}, // S7: Brünnchen
+    {x:300,y:425},{x:340,y:435},{x:380,y:445}, // S8: Pflanzgarten/Schwalbenschwanz
+    {x:410,y:455},{x:430,y:460},{x:450,y:460}, // S9: back to S/F
+];
+// Sector boundary indices in TRACK_POINTS array
+const SECTOR_BOUNDARIES = [0, 4, 7, 11, 15, 19, 22, 26, 29, 32];
+
+function getTrackPosition(sectorIndex, progress) {
+    // sectorIndex: 0-8, progress: 0-1 within sector
+    const startIdx = SECTOR_BOUNDARIES[sectorIndex];
+    const endIdx = SECTOR_BOUNDARIES[sectorIndex + 1] || TRACK_POINTS.length - 1;
+    const segPoints = [];
+    for (let i = startIdx; i <= endIdx; i++) segPoints.push(TRACK_POINTS[i]);
+    if (segPoints.length < 2) return segPoints[0];
+    const totalLen = segPoints.length - 1;
+    const pos = progress * totalLen;
+    const idx = Math.min(Math.floor(pos), totalLen - 1);
+    const t = pos - idx;
+    return {
+        x: segPoints[idx].x + (segPoints[idx+1].x - segPoints[idx].x) * t,
+        y: segPoints[idx].y + (segPoints[idx+1].y - segPoints[idx].y) * t,
+    };
+}
+
+function getCarTrackInfo(car) {
+    // Determine which sector the car is currently in based on filled sector times
+    let lastFilledSector = 0;
+    let sectorTimes = [];
+    for (let i = 1; i <= 9; i++) {
+        const st = car['S'+i+'TIME'];
+        if (st && st.trim()) {
+            lastFilledSector = i;
+            sectorTimes.push(lapTimeToSeconds(st));
+        } else {
+            break;
+        }
+    }
+    // Car is currently in sector (lastFilledSector + 1), or sector 1 if none filled
+    const currentSector = lastFilledSector < 9 ? lastFilledSector : 0; // 0-indexed
+    // Estimate progress within current sector using LASTIMTIME
+    const now = Date.now();
+    const lastIm = parseInt(car.LASTIMTIME) || now;
+    const elapsed = (now - lastIm) / 1000;
+    // Average sector time ~ avgLap / 9
+    const avgLapSec = lapTimeToSeconds(car.LASTLAPTIME);
+    const avgSectorTime = isFinite(avgLapSec) && avgLapSec > 0 ? avgLapSec / 9 : 60;
+    const progress = Math.min(0.95, elapsed / avgSectorTime);
+    return { sector: currentSector, progress, sectorTimes, lastFilledSector };
+}
+
+// Class colors for track dots
+const CLASS_COLORS = {
+    'SP 9': '#3b82f6', 'SP 8T': '#22c55e', 'SP 8': '#22c55e',
+    'SP 7': '#f59e0b', 'SP 10': '#a855f7', 'CUP 2': '#ec4899',
+    'CUP 3': '#f97316', 'SP-X': '#06b6d4', 'SP 4T': '#84cc16',
+    'SP 4': '#84cc16', 'SP 3T': '#eab308', 'SP 3': '#eab308',
+    'SP 2': '#64748b', 'TCR': '#14b8a6', 'GT4': '#8b5cf6',
+};
+function classColor(cls) { return CLASS_COLORS[cls] || '#64748b'; }
+
+let trackFilterClasses = new Set();
+let trackShowTop = 0; // 0 = all
+
+function showTrackMap() {
+    currentView = 'trackmap';
+    renderTrackMap();
+}
+
+function renderTrackMap() {
+    if (!resultsData) return;
+    const R = resultsData.RESULT;
+    const classes = [...new Set(R.map(r => r.CLASSNAME))];
+    if (trackFilterClasses.size === 0) classes.forEach(c => trackFilterClasses.add(c));
+
+    let html = `<button class="back-btn" onclick="goBack()">← Back to Leaderboard</button>`;
+
+    // ── Track Map Section ──
+    html += `<div class="track-section"><div class="track-container">
+        <div class="track-header">
+            <h2>Live Track Map</h2>
+            <div class="track-legend">
+                ${classes.map(c => `<div class="track-legend-item"><div class="track-legend-dot" style="background:${classColor(c)}"></div>${c}</div>`).join('')}
+            </div>
+        </div>
+        <div class="track-filter">
+            <span class="chip ${trackShowTop===0?'on':''}" onclick="trackShowTop=0;renderTrackMap()">All Cars</span>
+            <span class="chip ${trackShowTop===10?'on':''}" onclick="trackShowTop=10;renderTrackMap()">Top 10</span>
+            <span class="chip ${trackShowTop===20?'on':''}" onclick="trackShowTop=20;renderTrackMap()">Top 20</span>
+            ${classes.map(c => `<span class="chip ${trackFilterClasses.has(c)?'on':''}" onclick="toggleTrackClass('${c}')">${c}</span>`).join('')}
+        </div>
+        <div class="track-svg-wrap">
+            <svg viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg">
+                <!-- Track outline -->
+                <path d="${buildTrackPath()}" fill="none" stroke="#334155" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="${buildTrackPath()}" fill="none" stroke="#1e293b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Sector markers -->
+                ${SECTOR_BOUNDARIES.slice(0, 9).map((idx, i) => {
+                    const p = TRACK_POINTS[idx];
+                    return `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#475569"/>
+                            <text x="${p.x}" y="${p.y - 10}" class="sector-label" text-anchor="middle">S${i+1}</text>`;
+                }).join('')}
+                <!-- Start/Finish -->
+                <rect x="440" y="468" width="20" height="3" fill="#fff" rx="1"/>
+                <text x="450" y="485" class="sector-label" text-anchor="middle" fill="#94a3b8" font-size="9">S/F</text>
+                <!-- Car dots -->
+                ${renderCarDots(R)}
+            </svg>
+        </div>
+        <div class="track-stats">
+            <div class="track-stat"><div class="ts-label">Cars on Track</div><div class="ts-value">${R.length}</div></div>
+            <div class="track-stat"><div class="ts-label">Leader</div><div class="ts-value">#${R[0]?.STNR} ${escH(R[0]?.TEAM||'')}</div></div>
+            <div class="track-stat"><div class="ts-label">Fastest Lap</div><div class="ts-value">${R.reduce((b,r)=>{const t=lapTimeToSeconds(r.FASTESTLAP);return t<b.t?{t,s:`#${r.STNR} ${r.FASTESTLAP}`}:b;},{t:Infinity,s:'-'}).s}</div></div>
+            <div class="track-stat"><div class="ts-label">Laps Completed</div><div class="ts-value">${R[0]?.LAPS||'-'}</div></div>
+        </div>
+    </div></div>`;
+
+    // ── Traffic Prediction Section ──
+    html += renderTrafficPrediction(R);
+
+    document.getElementById('app').innerHTML = html;
+}
+
+function buildTrackPath() {
+    return 'M ' + TRACK_POINTS.map(p => `${p.x} ${p.y}`).join(' L ') + ' Z';
+}
+
+function renderCarDots(R) {
+    let filtered = R.filter(r => trackFilterClasses.has(r.CLASSNAME));
+    if (trackShowTop > 0) filtered = filtered.filter(r => r.POSITION <= trackShowTop);
+    return filtered.map(r => {
+        const info = getCarTrackInfo(r);
+        const pos = getTrackPosition(info.sector, info.progress);
+        const color = classColor(r.CLASSNAME);
+        return `<circle class="car-dot" cx="${pos.x}" cy="${pos.y}" r="5" fill="${color}" stroke="#0f172a" stroke-width="1.5" onclick="showCarDetail('${r.STNR}')">
+                    <title>#${r.STNR} ${r.TEAM} (P${r.POSITION}) - S${info.sector+1}</title>
+                </circle>
+                <text class="car-label" x="${pos.x}" y="${pos.y}">${r.STNR}</text>`;
+    }).join('');
+}
+
+function toggleTrackClass(cls) {
+    trackFilterClasses.has(cls) ? trackFilterClasses.delete(cls) : trackFilterClasses.add(cls);
+    renderTrackMap();
+}
+
+// ── Traffic Prediction Engine ──
+function renderTrafficPrediction(R) {
+    // Build pace data for each car
+    const cars = R.map(r => {
+        const avgLapSec = lapTimeToSeconds(r.LASTLAPTIME);
+        const bestLapSec = lapTimeToSeconds(r.FASTESTLAP);
+        // Use race avg from stint data if available
+        let raceAvgSec = avgLapSec;
+        const si = stintsData ? stintsData.STINTS.find(s => s.STNR === r.STNR) : null;
+        if (si) {
+            let ts = 0, tl = 0;
+            si.DRIVERS.forEach(d => {
+                const l = parseInt(d.LAPS) || 0;
+                const t = lapTimeToSeconds(d.TOTALTIME);
+                if (l > 0 && isFinite(t)) { ts += t; tl += l; }
+            });
+            if (tl > 0) raceAvgSec = ts / tl;
+        }
+        // Parse gap to leader in seconds
+        let gapSec = parseGapSeconds(r.GAP, r);
+        return {
+            stnr: r.STNR, team: r.TEAM, pos: r.POSITION, cls: r.CLASSNAME,
+            laps: parseInt(r.LAPS) || 0, car: r.CAR, driver: r.NAME,
+            avgLap: isFinite(raceAvgSec) ? raceAvgSec : 600,
+            bestLap: isFinite(bestLapSec) ? bestLapSec : 600,
+            gapToLeader: gapSec,
+            trackInfo: getCarTrackInfo(r),
+        };
+    });
+
+    // Find traffic encounters: when will a faster car catch a slower car ahead on track
+    const encounters = [];
+    // For top N cars, check against all slower cars that are physically close
+    const topCars = cars.filter(c => c.pos <= 20); // Focus on top 20
+    topCars.forEach(fast => {
+        cars.forEach(slow => {
+            if (fast.stnr === slow.stnr) return;
+            if (fast.avgLap >= slow.avgLap) return; // fast must be faster
+            const paceGapPerLap = slow.avgLap - fast.avgLap; // seconds gained per lap
+            if (paceGapPerLap < 0.5) return; // negligible
+
+            // Calculate current time gap between them
+            let timeGap;
+            if (fast.laps === slow.laps) {
+                // Same lap: use gap difference to leader
+                timeGap = slow.gapToLeader - fast.gapToLeader;
+            } else if (fast.laps > slow.laps) {
+                // Fast car is ahead by laps — slow car is being lapped
+                const lapDiff = fast.laps - slow.laps;
+                timeGap = (lapDiff * fast.avgLap) - (fast.gapToLeader - slow.gapToLeader);
+            } else {
+                return; // slow car ahead in laps — doesn't make sense for traffic
+            }
+
+            if (timeGap <= 0 || !isFinite(timeGap)) return;
+            if (timeGap > fast.avgLap * 2) return; // more than 2 laps away, skip
+
+            const lapsToEncounter = timeGap / paceGapPerLap;
+            const timeToEncounter = lapsToEncounter * fast.avgLap;
+
+            if (lapsToEncounter > 15) return; // too far out
+
+            let severity = 'clear';
+            if (timeGap < 5) severity = 'danger';
+            else if (timeGap < 30) severity = 'warn';
+            else if (lapsToEncounter < 3) severity = 'warn';
+
+            encounters.push({
+                fast, slow, timeGap, paceGapPerLap,
+                lapsToEncounter, timeToEncounter, severity,
+            });
+        });
+    });
+
+    // Sort by urgency
+    encounters.sort((a, b) => a.timeGap - b.timeGap);
+    const topEncounters = encounters.slice(0, 30);
+
+    let html = `<div class="traffic-section"><div class="traffic-container">
+        <div class="track-header">
+            <h2>Traffic Prediction</h2>
+            <div style="color:#64748b;font-size:.75rem">${encounters.length} potential encounters detected</div>
+        </div>`;
+
+    if (topEncounters.length === 0) {
+        html += '<p style="color:#64748b;padding:20px;text-align:center">No significant traffic encounters predicted</p>';
+    } else {
+        html += `<table class="traffic-table"><thead><tr>
+            <th>Status</th><th>Fast Car</th><th>Slow Car</th><th>Current Gap</th>
+            <th>Pace Δ/Lap</th><th>Catch In</th><th>Est. Time</th><th>Class</th>
+        </tr></thead><tbody>`;
+        topEncounters.forEach(e => {
+            const tag = e.severity === 'danger' ? '<span class="traffic-tag danger">IN TRAFFIC</span>'
+                      : e.severity === 'warn' ? '<span class="traffic-tag warn">APPROACHING</span>'
+                      : '<span class="traffic-tag clear">CLEAR</span>';
+            html += `<tr>
+                <td style="font-family:inherit">${tag}</td>
+                <td style="cursor:pointer" onclick="showCarDetail('${e.fast.stnr}')">
+                    <span style="color:${classColor(e.fast.cls)}">#${e.fast.stnr}</span>
+                    <span style="color:#94a3b8;font-family:inherit;font-size:.75rem"> P${e.fast.pos}</span>
+                </td>
+                <td style="cursor:pointer" onclick="showCarDetail('${e.slow.stnr}')">
+                    <span style="color:${classColor(e.slow.cls)}">#${e.slow.stnr}</span>
+                    <span style="color:#94a3b8;font-family:inherit;font-size:.75rem"> P${e.slow.pos}</span>
+                </td>
+                <td class="${e.severity==='danger'?'traffic-danger':e.severity==='warn'?'traffic-warn':''}">${secondsToTime(e.timeGap)}</td>
+                <td>${e.paceGapPerLap.toFixed(1)}s</td>
+                <td>${e.lapsToEncounter<1?'<1':e.lapsToEncounter.toFixed(1)} laps</td>
+                <td>${secondsToTime(e.timeToEncounter)}</td>
+                <td style="font-family:inherit;font-size:.75rem">${e.fast.cls} vs ${e.slow.cls}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+    }
+    html += '</div></div>';
+    return html;
+}
+
+function parseGapSeconds(gap, car) {
+    if (!gap) return 0;
+    // Format: "----LAP XX" means leader on that lap
+    if (gap.includes('LAP')) return 0; // leader
+    // Format: "MM:SS.mmm" or "SS.mmm"
+    return lapTimeToSeconds(gap);
+}
+
+function goBack(){currentView='leaderboard';currentCar=null;renderLeaderboard();}
+
+// ── Init ──
+const resultsConn=new LiveTimingConnection([0,4],msg=>{if(msg.PID==='0'){resultsData=msg;document.getElementById('statusDot').classList.add('connected');document.getElementById('statusText').textContent='Live';document.getElementById('raceTitle').textContent=msg.CUP||'N24h';document.getElementById('raceInfo').textContent=`${msg.HEAT} | ${msg.TRACKNAME} | ${msg.RESULT?.length||0} cars`;if(currentView==='leaderboard')renderLeaderboard();if(currentView==='trackmap')renderTrackMap();}});
+const stintsConn=new LiveTimingConnection([9001],msg=>{if(msg.PID==='9001')stintsData=msg;});
+</script>
+</body>
+</html>
