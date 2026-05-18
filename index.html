@@ -354,38 +354,31 @@ function renderLeaderboard() {
     if (!resultsData) return;
     const R = resultsData.RESULT;
     let html = `<div class="lb-toolbar">
-        <button class="btn" onclick="showTrackMap()">🗺 Track Map</button>
+        <button class="btn" onclick="showTrackMap()">Track Map</button>
         <button class="btn ${compareMode?'active':''}" onclick="toggleCompareMode()">${compareMode?'Cancel Compare':'Compare'}</button>
         ${compareMode?`<span class="compare-count">${compareSet.size} selected</span>
         <button class="btn compare-go" ${compareSet.size<2?'disabled':''} onclick="showCompare()">Compare Selected</button>`:''}
     </div>`;
     html += `<table class="leaderboard-table"><thead><tr>
         ${compareMode?'<th class="cb-cell"></th>':''}
-        <th>Pos</th><th>+/-</th><th>#</th><th>Team / Driver</th><th>Class</th><th>Car</th><th>Laps</th><th>Last Lap</th><th>Best Lap</th><th>Stint Avg</th><th>Race Avg</th><th>Gap</th><th>Pits</th>
+        <th>Pos</th><th>+/-</th><th>#</th><th>Team / Driver</th><th>Class</th><th>Car</th><th>Laps</th><th>Last Lap</th><th>Best Lap</th><th>Avg (No Pit)</th><th>Gap</th><th>Pits</th>
     </tr></thead><tbody>`;
     R.forEach(r => {
         const pc=r.POSITION<=3?`pos-${r.POSITION}`:'';
         const cc=r.CHG>0?'chg-up':r.CHG<0?'chg-down':'';
         const ct=r.CHG>0?`+${r.CHG}`:r.CHG<0?r.CHG:'';
         const sel=compareSet.has(r.STNR);
-        // Stint avg: current driver's STINTTIME / STINTLAPS
-        let stintAvg='-', raceAvg='-';
+        // Avg (No Pit): sum of all drivers' TOTALTIME / LAPS — TOTALTIME is on-track driving only, excludes pit lane time
+        let cleanAvg='-';
         const si=stintsData?stintsData.STINTS.find(s=>s.STNR===r.STNR):null;
         if(si){
-            const active=si.DRIVERS.find(d=>d.STATUS==='2');
-            if(active){
-                const sl=parseInt(active.STINTLAPS)||0;
-                const st=lapTimeToSeconds(active.STINTTIME);
-                if(sl>0&&isFinite(st)) stintAvg=secondsToTime(st/sl);
-            }
-            // Race avg: sum of all drivers' TOTALTIME / sum of all drivers' LAPS
             let totalSec=0, totalLaps=0;
             si.DRIVERS.forEach(d=>{
                 const l=parseInt(d.LAPS)||0;
                 const t=lapTimeToSeconds(d.TOTALTIME);
                 if(l>0&&isFinite(t)){totalSec+=t;totalLaps+=l;}
             });
-            if(totalLaps>0) raceAvg=secondsToTime(totalSec/totalLaps);
+            if(totalLaps>0) cleanAvg=secondsToTime(totalSec/totalLaps);
         }
         html += `<tr class="${sel?'selected-row':''}" onclick="${compareMode?`toggleCompare('${r.STNR}')`:`showCarDetail('${r.STNR}')`}">
             ${compareMode?`<td class="cb-cell"><input type="checkbox" ${sel?'checked':''} onclick="event.stopPropagation();toggleCompare('${r.STNR}')"></td>`:''}
@@ -396,8 +389,7 @@ function renderLeaderboard() {
             <td>${escH(r.CAR)}</td><td>${r.LAPS}</td>
             <td style="font-family:monospace">${r.LASTLAPTIME||'-'}</td>
             <td class="fastest" style="font-family:monospace">${r.FASTESTLAP||'-'}</td>
-            <td style="font-family:monospace;color:#06b6d4">${stintAvg}</td>
-            <td style="font-family:monospace;color:#94a3b8">${raceAvg}</td>
+            <td style="font-family:monospace;color:#06b6d4">${cleanAvg}</td>
             <td style="font-family:monospace">${formatGap(r.GAP)}</td>
             <td>${r.PITSTOPCOUNT||0}</td></tr>`;
     });
@@ -885,7 +877,7 @@ function showTrackMap() {
         renderTrackMap();
     } catch(e) {
         console.error('TrackMap error:', e);
-        alert('TrackMap error: ' + e.message);
+        document.getElementById('app').innerHTML = '<div style="padding:40px;color:#ef4444"><h2>TrackMap Error</h2><pre>'+e.message+'\n'+e.stack+'</pre></div>';
     }
 }
 
